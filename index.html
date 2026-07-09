@@ -111,20 +111,19 @@
         const overlayTitle = document.getElementById('overlay-title');
         const overlayDesc = document.getElementById('overlay-desc');
         const buttonArea = document.getElementById('button-area');
-        const gameContainer = document.getElementById('game-container');
 
         // 동적 높이 계산
         function adjustLayout() {
-            const headerHeight = 72; // 상단 바 높이 (py-3 = 12px * 2 + text height)
+            const headerHeight = 72;
             const screenHeight = window.innerHeight;
             const availableHeight = screenHeight - headerHeight;
-            const buttonHeight = Math.max(availableHeight * 0.5, 100); // 50% 이상 할당
+            const buttonHeight = Math.max(availableHeight * 0.5, 100);
             
             buttonArea.style.height = buttonHeight + 'px';
             buttonArea.style.padding = '8px';
         }
 
-        // 호루라기 효과음
+        // 호루라기 효과음 (FM 변조)
         function playWhistle() {
             try {
                 const ctx = getAudioContext();
@@ -219,15 +218,23 @@
             return new Promise(resolve => {
                 const counts = ['3', '2', '1', 'GO!'];
                 let i = 0;
-                const timer = setInterval(() => {
-                    msgOverlay.innerHTML = `<span class="animate-count text-white">${counts[i]}</span>`;
-                    playWhistle();
-                    i++;
-                    if (i >= counts.length) {
-                        clearInterval(timer);
-                        setTimeout(() => { msgOverlay.innerHTML = ''; resolve(); }, 500);
+                
+                // BPM에 따른 박자 간격 (밀리초)
+                const beatInterval = 60000 / state.bpm;
+                
+                const playBeat = () => {
+                    if (i < counts.length) {
+                        msgOverlay.innerHTML = `<span class="animate-count text-white">${counts[i]}</span>`;
+                        playWhistle();
+                        i++;
+                        setTimeout(playBeat, beatInterval);
+                    } else {
+                        msgOverlay.innerHTML = '';
+                        resolve();
                     }
-                }, 1000);
+                };
+                
+                playBeat();
             });
         }
 
@@ -252,6 +259,7 @@
             slots.forEach(s => s.classList.remove('active-card'));
             slots[state.currentIndex].classList.add('active-card');
             
+            // 박자 신호음 재생
             playWhistle();
             state.canInput = true;
 
@@ -311,7 +319,7 @@
             document.getElementById('score').innerText = state.score;
         }
 
-        // 초기 설정 및 리사이즈 이벤트
+        // 초기 설정
         window.addEventListener('load', () => {
             getAudioContext();
             adjustLayout();
