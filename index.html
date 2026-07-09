@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>리듬 과일 서바이벌</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-card { border: 6px solid #fbbf24 !important; background-color: #fef3c7 !important; transform: scale(1.1); z-index: 10; }
+        @keyframes zoomResult {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1.5); opacity: 1; }
+        }
+        .animate-result { animation: zoomResult 0.5s ease-out forwards; }
+        body { touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; background-color: #0f172a; }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden text-white">
+
+    <!-- 상단 바 -->
+    <div class="p-4 bg-slate-800 flex justify-between items-center shadow-2xl">
+        <div class="text-left">
+            <p class="text-[10px] text-slate-400 uppercase">Level</p>
+            <p id="level" class="text-2xl font-black text-yellow-400">1</p>
+        </div>
+        <div id="combo-display" class="text-xl font-bold text-blue-400">READY</div>
+        <div class="text-right">
+            <p class="text-[10px] text-slate-400 uppercase">Score</p>
+            <p id="score" class="text-2xl font-black text-green-400">0</p>
+        </div>
+    </div>
+
+    <!-- 게임 필드 -->
+    <div class="flex-1 p-6 flex items-center justify-center relative">
+        <!-- 카운트다운 및 결과 문구 -->
+        <div id="msg-overlay" class="absolute inset-0 flex items-center justify-center text-6xl font-black z-50 pointer-events-none text-center"></div>
+
+        <div id="grid" class="grid grid-cols-4 grid-rows-2 gap-3 w-full max-w-sm aspect-[4/2]">
+            <!-- 8개 슬롯 -->
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-4xl shadow-lg transition-all"></div>
+        </div>
+    </div>
+
+    <!-- 하단 4개 버튼 -->
+    <div class="p-8 bg-slate-800 rounded-t-[3rem] shadow-2xl border-t border-slate-700">
+        <div id="button-container" class="flex justify-center gap-4 max-w-sm mx-auto">
+            <!-- 4개의 버튼 고정 -->
+        </div>
+    </div>
+
+    <!-- 시작/게임오버 오버레이 -->
+    <div id="main-overlay" class="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-6 text-center">
+        <h1 id="overlay-title" class="text-5xl font-black text-yellow-400 mb-4 italic">FRUIT PANIC</h1>
+        <p id="overlay-desc" class="text-slate-400 mb-10">실수하면 즉시 종료!<br>박자에 맞춰 8개의 과일을 클리어하세요.</p>
+        <button id="start-btn" onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-5 px-16 rounded-full text-2xl shadow-2xl active:scale-95 transition-all">START</button>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const FRUITS = [
+            { id: 'apple', icon: '🍎' },
+            { id: 'banana', icon: '🍌' },
+            { id: 'grape', icon: '🍇' },
+            { id: 'orange', icon: '🍊' }
+        ];
+
+        let state = {
+            score: 0,
+            level: 1,
+            bpm: 50, // 레벨 1은 매우 여유로움
+            sequence: [],
+            currentIndex: 0,
+            isPlaying: false,
+            canInput: false,
+            beatTimer: null
+        };
+
+        const slots = document.querySelectorAll('.slot');
+        const msgOverlay = document.getElementById('msg-overlay');
+        const mainOverlay = document.getElementById('main-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayDesc = document.getElementById('overlay-desc');
+
+        // 호루라기 비트음
+        function playWhistle() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(900, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // 하단 버튼 4개 고정 생성
+        function initButtons() {
+            const container = document.getElementById('button-container');
+            container.innerHTML = '';
+            FRUITS.forEach(fruit => {
+                const btn = document.createElement('button');
+                btn.className = "flex-1 aspect-square bg-slate-700 rounded-3xl text-4xl shadow-xl border-b-8 border-slate-900 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center";
+                btn.innerHTML = fruit.icon;
+                btn.onclick = () => handleInput(fruit.id);
+                container.appendChild(btn);
+            });
+        }
+
+        function startGame() {
+            audioCtx.resume();
+            mainOverlay.classList.add('hidden');
+            state.score = 0;
+            state.level = 1;
+            state.bpm = 50;
+            updateUI();
+            initButtons();
+            startLevel();
+        }
+
+        async function startLevel() {
+            state.isPlaying = false;
+            state.sequence = generateSequence();
+            
+            // 화면 초기화 및 과일 배치
+            slots.forEach((slot, i) => {
+                slot.innerHTML = state.sequence[i].icon;
+                slot.classList.remove('active-card');
+            });
+
+            // 3, 2, 1 카운트다운
+            await runCountdown();
+            
+            state.currentIndex = 0;
+            state.isPlaying = true;
+            nextBeat();
+        }
+
+        function runCountdown() {
+            return new Promise(resolve => {
+                const counts = ['3', '2', '1', 'GO!'];
+                let i = 0;
+                const timer = setInterval(() => {
+                    msgOverlay.innerHTML = `<span class="animate-count text-white">${counts[i]}</span>`;
+                    playWhistle();
+                    i++;
+                    if (i >= counts.length) {
+                        clearInterval(timer);
+                        setTimeout(() => { msgOverlay.innerHTML = ''; resolve(); }, 500);
+                    }
+                }, 1000);
+            });
+        }
+
+        function generateSequence() {
+            let pool = [];
+            if (state.level === 1) {
+                // 레벨 1: 무조건 사과만 8개
+                pool = Array(8).fill(FRUITS[0]);
+            } else if (state.level === 2) {
+                // 레벨 2: 사과와 바나나 섞기
+                pool = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * 2)]);
+            } else {
+                // 레벨 3 이상: 4가지 무작위
+                pool = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * 4)]);
+            }
+            return pool;
+        }
+
+        function nextBeat() {
+            if (state.currentIndex >= 8) {
+                levelClear();
+                return;
+            }
+
+            // 하이라이트 이동 (좌->우 순서)
+            slots.forEach(s => s.classList.remove('active-card'));
+            slots[state.currentIndex].classList.add('active-card');
+            
+            playWhistle();
+            state.canInput = true;
+
+            const interval = 60000 / state.bpm;
+            state.beatTimer = setTimeout(() => {
+                if (state.canInput) gameOver("박자를 놓쳤습니다!");
+            }, interval);
+        }
+
+        function handleInput(id) {
+            if (!state.isPlaying || !state.canInput) return;
+            
+            if (navigator.vibrate) navigator.vibrate(50);
+            clearTimeout(state.beatTimer);
+            state.canInput = false;
+
+            if (id === state.sequence[state.currentIndex].id) {
+                state.score += 10;
+                updateUI();
+                state.currentIndex++;
+                setTimeout(nextBeat, 50); // 약간의 유예 시간 후 다음 박자
+            } else {
+                gameOver("틀린 과일을 눌렀습니다!");
+            }
+        }
+
+        function levelClear() {
+            state.isPlaying = false;
+            slots.forEach(s => s.classList.remove('active-card'));
+            
+            // 결과 문구 랜덤 표시
+            const results = ['PERFECT!', 'EXCELLENT!', 'GREAT!', 'AMAZING!'];
+            const res = results[Math.floor(Math.random() * results.length)];
+            msgOverlay.innerHTML = `<span class="animate-result text-yellow-400 drop-shadow-lg">${res}</span>`;
+
+            setTimeout(() => {
+                msgOverlay.innerHTML = '';
+                state.level++;
+                state.bpm += 15; // 레벨업 시 속도 증가
+                startLevel();
+            }, 2000);
+        }
+
+        function gameOver(reason) {
+            clearTimeout(state.beatTimer);
+            state.isPlaying = false;
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+            overlayTitle.innerText = "GAME OVER";
+            overlayTitle.classList.replace('text-yellow-400', 'text-red-500');
+            overlayDesc.innerHTML = `${reason}<br><br><span class="text-white text-2xl font-bold">최종 점수: ${state.score}</span>`;
+            document.getElementById('start-btn').innerText = "TRY AGAIN";
+            mainOverlay.classList.remove('hidden');
+        }
+
+        function updateUI() {
+            document.getElementById('level').innerText = state.level;
+            document.getElementById('score').innerText = state.score;
+        }
+    </script>
+</body>
+</html>
