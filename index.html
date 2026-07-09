@@ -63,7 +63,7 @@
         </div>
 
         <!-- 하단 4개 버튼 -->
-        <div id="button-area" class="flex-shrink-0 bg-slate-800 shadow-2xl border-t border-slate-700">
+        <div id="button-area" class="flex-shrink-0 bg-slate-800 px-2">
             <div id="button-container" class="flex justify-center gap-2 max-w-md mx-auto h-full items-center">
                 <!-- 4개의 버튼 고정 -->
             </div>
@@ -115,14 +115,13 @@
 
         // 동적 높이 계산
         function adjustLayout() {
-            const headerHeight = document.querySelector('[class*="flex-shrink-0"]').offsetHeight;
+            const headerHeight = 72; // 상단 바 높이 (py-3 = 12px * 2 + text height)
             const screenHeight = window.innerHeight;
             const availableHeight = screenHeight - headerHeight;
-            const gameFieldHeight = availableHeight * 0.65;
-            const buttonHeight = availableHeight * 0.35;
+            const buttonHeight = Math.max(availableHeight * 0.5, 100); // 50% 이상 할당
             
-            buttonArea.style.height = Math.max(buttonHeight, 80) + 'px';
-            buttonArea.style.padding = '6px';
+            buttonArea.style.height = buttonHeight + 'px';
+            buttonArea.style.padding = '8px';
         }
 
         // 호루라기 효과음
