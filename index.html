@@ -21,11 +21,13 @@
             position: fixed;
         }
 
+        /* 자바스크립트가 동적으로 계산한 실제 가시 높이(--vh)를 반영 */
         #game-container {
             display: flex;
             flex-direction: column;
-            height: 100vh;
             width: 100%;
+            height: 100vh; /* 폴백(Fallback) 용도 */
+            height: calc(var(--vh, 1vh) * 100); 
             position: relative;
             z-index: 1;
         }
@@ -142,6 +144,18 @@
     </div>
 
     <script>
+        // --- 동적 높이 계산 장치 (크롬 하단 바 이슈 완벽 방어) ---
+        function setScreenSize() {
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        
+        // 뷰포트 초기화 및 리사이즈 이벤트 바인딩
+        setScreenSize();
+        window.addEventListener('resize', setScreenSize);
+        window.addEventListener('orientationchange', setScreenSize);
+        // --------------------------------------------------------
+
         let audioCtx = null;
         function getAudioContext() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -155,13 +169,12 @@
             { id: 'orange', icon: '🍊' }
         ];
 
-        // [난이도 밸런싱 변수] 4단계부터 급격한 지옥의 속도 세팅
         const LEVEL_CONFIG = {
-            1: { bpm: 60, poolSize: 1 },  // 오직 사과만, 매우 여유로움
-            2: { bpm: 75, poolSize: 2 },  // 사과, 바나나 교차
-            3: { bpm: 90, poolSize: 3 },  // 3종 과일 등장 (여기까지 이지 모드)
-            4: { bpm: 155, poolSize: 4 }, // ★ 속도 급상승, 4종 전체 무작위 매핑
-            5: { bpm: 210, poolSize: 4 }  // ★ 인간의 한계 돌파 급 초고속 박자
+            1: { bpm: 60, poolSize: 1 },  
+            2: { bpm: 75, poolSize: 2 },  
+            3: { bpm: 90, poolSize: 3 },  
+            4: { bpm: 155, poolSize: 4 }, 
+            5: { bpm: 210, poolSize: 4 }  
         };
 
         let state = {
@@ -180,7 +193,6 @@
         const overlayTitle = document.getElementById('overlay-title');
         const overlayDesc = document.getElementById('overlay-desc');
 
-        // 박자 고주파 메트로놈 피드백 사운드
         function playWhistle() {
             try {
                 const ctx = getAudioContext();
@@ -189,7 +201,6 @@
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 
-                // 난이도가 높으면 더 날카로운 사운드로 텐션 제공
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(state.level >= 4 ? 1300 : 800, now);
                 osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
@@ -204,7 +215,6 @@
             } catch (e) {}
         }
 
-        // 하단 4개 조작 패드 초기화 (정사각형 격자 동적 렌더링)
         function initButtons() {
             const container = document.getElementById('button-container');
             container.innerHTML = '';
@@ -217,7 +227,6 @@
                     e.preventDefault();
                     handleInput(fruit.id);
                 };
-                // 모바일 터치 및 데스크톱 마우스 클릭 핸들러 동시 바인딩 (터치 밀림 현상 zero)
                 btn.addEventListener('touchstart', triggerInput, { passive: false });
                 btn.addEventListener('mousedown', triggerInput);
                 container.appendChild(btn);
@@ -252,7 +261,6 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // 상단 Step Tracker 디자인 변경 함수
         function updateStepTracker() {
             for (let i = 1; i <= 5; i++) {
                 const dot = document.getElementById(`step-${i}`);
@@ -298,7 +306,6 @@
             });
         }
 
-        // 박자에 연동되어 하이라이트를 한 칸씩 정밀 이동하는 장치
         function updateBeatHighlight() {
             if (state.currentIndex >= 8) return;
             slots.forEach((s, idx) => {
@@ -314,7 +321,6 @@
             state.canInput = true;
         }
 
-        // 브라우저 프레임 드랍 현상을 상쇄하는 정밀 타이머 루프
         function gameLoop(timestamp) {
             if (!state.isPlaying) return;
             const elapsed = timestamp - state.beatStartTime;
@@ -340,8 +346,6 @@
 
             if (id === state.sequence[state.currentIndex].id) {
                 if (navigator.vibrate) navigator.vibrate(15);
-                
-                // 정답 맞춤 표시 즉시 피드백
                 slots[state.currentIndex].className = "slot fruit-card text-3xl font-bold success-card";
                 state.currentIndex++;
             } else {
