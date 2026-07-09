@@ -13,6 +13,12 @@
             padding: 0;
             overflow: hidden;
         }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
         .active-card { border: 6px solid #fbbf24 !important; background-color: #fef3c7 !important; transform: scale(1.1); z-index: 10; }
         @keyframes zoomResult {
             0% { transform: scale(0.5); opacity: 0; }
@@ -22,48 +28,50 @@
         body { touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; background-color: #0f172a; }
     </style>
 </head>
-<body class="flex flex-col h-screen overflow-hidden text-white">
+<body>
+    <div id="game-container" class="text-white">
 
-    <!-- 상단 바 -->
-    <div class="flex-shrink-0 px-4 py-3 bg-slate-800 flex justify-between items-center shadow-2xl">
-        <div class="text-left">
-            <p class="text-[10px] text-slate-400 uppercase">Level</p>
-            <p id="level" class="text-2xl font-black text-yellow-400">1</p>
+        <!-- 상단 바 -->
+        <div class="flex-shrink-0 px-4 py-3 bg-slate-800 flex justify-between items-center shadow-2xl">
+            <div class="text-left">
+                <p class="text-[10px] text-slate-400 uppercase">Level</p>
+                <p id="level" class="text-2xl font-black text-yellow-400">1</p>
+            </div>
+            <div id="combo-display" class="text-xl font-bold text-blue-400">READY</div>
+            <div class="text-right">
+                <p class="text-[10px] text-slate-400 uppercase">Score</p>
+                <p id="score" class="text-2xl font-black text-green-400">0</p>
+            </div>
         </div>
-        <div id="combo-display" class="text-xl font-bold text-blue-400">READY</div>
-        <div class="text-right">
-            <p class="text-[10px] text-slate-400 uppercase">Score</p>
-            <p id="score" class="text-2xl font-black text-green-400">0</p>
+
+        <!-- 게임 필드 -->
+        <div class="flex-1 min-h-0 px-4 py-4 flex items-center justify-center relative overflow-hidden">
+            <!-- 카운트다운 및 결과 문구 -->
+            <div id="msg-overlay" class="absolute inset-0 flex items-center justify-center text-6xl font-black z-50 pointer-events-none text-center"></div>
+
+            <div id="grid" class="grid grid-cols-4 grid-rows-2 gap-2 w-full max-w-md aspect-[4/2]">
+                <!-- 8개 슬롯 -->
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+            </div>
         </div>
-    </div>
 
-    <!-- 게임 필드 -->
-    <div class="flex-1 min-h-0 px-4 py-4 flex items-center justify-center relative">
-        <!-- 카운트다운 및 결과 문구 -->
-        <div id="msg-overlay" class="absolute inset-0 flex items-center justify-center text-6xl font-black z-50 pointer-events-none text-center"></div>
-
-        <div id="grid" class="grid grid-cols-4 grid-rows-2 gap-2 w-full max-w-md aspect-[4/2]">
-            <!-- 8개 슬롯 -->
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-            <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-        </div>
-    </div>
-
-    <!-- 하단 4개 버튼 -->
-    <div class="flex-shrink-0 px-3 py-2 bg-slate-800 shadow-2xl border-t border-slate-700">
-        <div id="button-container" class="flex justify-center gap-2 max-w-md mx-auto">
-            <!-- 4개의 버튼 고정 -->
+        <!-- 하단 4개 버튼 -->
+        <div id="button-area" class="flex-shrink-0 bg-slate-800 shadow-2xl border-t border-slate-700">
+            <div id="button-container" class="flex justify-center gap-2 max-w-md mx-auto h-full items-center">
+                <!-- 4개의 버튼 고정 -->
+            </div>
         </div>
     </div>
 
     <!-- 시작/게임오버 오버레이 -->
-    <div id="main-overlay" class="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-4 sm:p-6 text-center overflow-y-auto">
+    <div id="main-overlay" class="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-4 sm:p-6 text-center overflow-y-auto text-white">
         <h1 id="overlay-title" class="text-4xl sm:text-5xl font-black text-yellow-400 mb-4 italic">RHYTHM GAME</h1>
         <p id="overlay-desc" class="text-slate-400 mb-8 sm:mb-10 text-sm sm:text-base">실수하면 즉시 종료!<br>박자에 맞춰 8개의 과일을 클리어하세요.</p>
         <button id="start-btn" onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-4 sm:py-5 px-12 sm:px-16 rounded-full text-lg sm:text-2xl shadow-2xl active:scale-95 transition-all">START</button>
@@ -102,8 +110,22 @@
         const mainOverlay = document.getElementById('main-overlay');
         const overlayTitle = document.getElementById('overlay-title');
         const overlayDesc = document.getElementById('overlay-desc');
+        const buttonArea = document.getElementById('button-area');
+        const gameContainer = document.getElementById('game-container');
 
-        // 호루라기 효과음 (더 선명하고 호루라기 같은 음성)
+        // 동적 높이 계산
+        function adjustLayout() {
+            const headerHeight = document.querySelector('[class*="flex-shrink-0"]').offsetHeight;
+            const screenHeight = window.innerHeight;
+            const availableHeight = screenHeight - headerHeight;
+            const gameFieldHeight = availableHeight * 0.65;
+            const buttonHeight = availableHeight * 0.35;
+            
+            buttonArea.style.height = Math.max(buttonHeight, 80) + 'px';
+            buttonArea.style.padding = '6px';
+        }
+
+        // 호루라기 효과음
         function playWhistle() {
             try {
                 const ctx = getAudioContext();
@@ -113,19 +135,16 @@
                 
                 const now = ctx.currentTime;
                 
-                // 첫 번째 오실레이터 (주파수)
                 const osc1 = ctx.createOscillator();
                 const osc2 = ctx.createOscillator();
                 const gain = ctx.createGain();
                 const lfo = ctx.createOscillator();
                 const lfoGain = ctx.createGain();
                 
-                // LFO (비브라토 효과)
                 lfo.frequency.value = 5;
                 lfoGain.gain.value = 30;
                 lfo.connect(lfoGain);
                 
-                // 오실레이터 설정 (호루라기 효과)
                 osc1.type = 'square';
                 osc1.frequency.setValueAtTime(1200, now);
                 lfoGain.connect(osc1.frequency);
@@ -133,7 +152,6 @@
                 osc2.type = 'triangle';
                 osc2.frequency.setValueAtTime(800, now);
                 
-                // 음량 설정
                 gain.gain.setValueAtTime(0.15, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
                 
@@ -141,7 +159,6 @@
                 osc2.connect(gain);
                 gain.connect(ctx.destination);
                 
-                // 실행
                 osc1.start(now);
                 osc2.start(now);
                 lfo.start(now);
@@ -154,13 +171,14 @@
             }
         }
 
-        // 하단 버튼 4개 고정 생성
+        // 하단 버튼 4개 생성
         function initButtons() {
             const container = document.getElementById('button-container');
             container.innerHTML = '';
             FRUITS.forEach(fruit => {
                 const btn = document.createElement('button');
-                btn.className = "flex-1 aspect-square bg-slate-700 rounded-3xl text-3xl sm:text-4xl shadow-xl border-b-8 border-slate-900 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center hover:bg-slate-600";
+                btn.className = "flex-1 bg-slate-700 rounded-3xl text-3xl sm:text-4xl shadow-xl border-b-8 border-slate-900 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center hover:bg-slate-600";
+                btn.style.aspectRatio = '1 / 1';
                 btn.innerHTML = fruit.icon;
                 btn.onclick = () => handleInput(fruit.id);
                 container.appendChild(btn);
@@ -170,9 +188,7 @@
         function startGame() {
             const ctx = getAudioContext();
             if (ctx.state === 'suspended') {
-                ctx.resume().then(() => {
-                    console.log('Audio context resumed');
-                });
+                ctx.resume();
             }
             
             mainOverlay.classList.add('hidden');
@@ -206,10 +222,7 @@
                 let i = 0;
                 const timer = setInterval(() => {
                     msgOverlay.innerHTML = `<span class="animate-count text-white">${counts[i]}</span>`;
-                    
-                    // 즉시 소리 재생
                     playWhistle();
-                    
                     i++;
                     if (i >= counts.length) {
                         clearInterval(timer);
@@ -299,10 +312,13 @@
             document.getElementById('score').innerText = state.score;
         }
 
-        // 페이지 로드 시 오디오 컨텍스트 생성
-        document.addEventListener('DOMContentLoaded', () => {
+        // 초기 설정 및 리사이즈 이벤트
+        window.addEventListener('load', () => {
             getAudioContext();
+            adjustLayout();
         });
+
+        window.addEventListener('resize', adjustLayout);
     </script>
 </body>
 </html>
