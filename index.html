@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>리듬 게임</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -12,69 +12,78 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
+            position: fixed; /* 모바일 스크롤 및 바운스 현상 원천 차단 */
         }
         #game-container {
             display: flex;
             flex-direction: column;
             height: 100vh;
+            height: -webkit-fill-available; /* iOS 주소창 대응 */
             width: 100%;
         }
-        .active-card { border: 6px solid #fbbf24 !important; background-color: #fef3c7 !important; transform: scale(1.1); z-index: 10; }
+        .active-card { 
+            border: 6px solid #fbbf24 !important; 
+            background-color: #fef3c7 !important; 
+            transform: scale(1.05); 
+            z-index: 10; 
+            color: #000;
+        }
         @keyframes zoomResult {
             0% { transform: scale(0.5); opacity: 0; }
-            100% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(1.3); opacity: 1; }
         }
-        .animate-result { animation: zoomResult 0.5s ease-out forwards; }
-        body { touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; background-color: #0f172a; }
+        .animate-result { animation: zoomResult 0.3s ease-out forwards; }
+        body { 
+            touch-action: none; /* 모바일 드래그/줌 확대 기능 완전 차단 */
+            user-select: none; 
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent; 
+            background-color: #0f172a; 
+        }
     </style>
 </head>
 <body>
     <div id="game-container" class="text-white">
 
-        <!-- 상단 바 -->
-        <div class="flex-shrink-0 px-4 py-3 bg-slate-800 flex justify-between items-center shadow-2xl">
+        <div class="h-16 flex-shrink-0 px-4 bg-slate-800 flex justify-between items-center shadow-2xl z-10">
             <div class="text-left">
-                <p class="text-[10px] text-slate-400 uppercase">Level</p>
-                <p id="level" class="text-2xl font-black text-yellow-400">1</p>
+                <p class="text-[10px] text-slate-400 uppercase leading-none">Level</p>
+                <p id="level" class="text-xl font-black text-yellow-400">1</p>
             </div>
-            <div id="combo-display" class="text-xl font-bold text-blue-400">READY</div>
+            <div id="combo-display" class="text-lg font-bold text-blue-400 tracking-wider">READY</div>
             <div class="text-right">
-                <p class="text-[10px] text-slate-400 uppercase">Score</p>
-                <p id="score" class="text-2xl font-black text-green-400">0</p>
+                <p class="text-[10px] text-slate-400 uppercase leading-none">Score</p>
+                <p id="score" class="text-xl font-black text-green-400">0</p>
             </div>
         </div>
 
-        <!-- 게임 필드 -->
-        <div class="flex-1 min-h-0 px-4 py-4 flex items-center justify-center relative overflow-hidden">
-            <!-- 카운트다운 및 결과 문구 -->
-            <div id="msg-overlay" class="absolute inset-0 flex items-center justify-center text-6xl font-black z-50 pointer-events-none text-center"></div>
+        <div class="flex-1 min-h-0 px-4 py-2 flex flex-col items-center justify-center relative overflow-hidden">
+            <div id="msg-overlay" class="absolute inset-0 flex items-center justify-center text-5xl font-black z-30 pointer-events-none text-center drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)]"></div>
 
-            <div id="grid" class="grid grid-cols-4 grid-rows-2 gap-2 w-full max-w-md aspect-[4/2]">
-                <!-- 8개 슬롯 -->
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
-                <div class="slot bg-slate-700 rounded-2xl border-2 border-slate-600 flex items-center justify-center text-3xl sm:text-4xl shadow-lg transition-all"></div>
+            <div class="w-full max-w-sm aspect-[4/2] flex flex-col justify-center">
+                <div id="grid" class="grid grid-cols-4 grid-rows-2 gap-2 h-full">
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                    <div class="slot bg-slate-700 rounded-xl border-2 border-slate-600 flex items-center justify-center text-3xl shadow-lg transition-all duration-75"></div>
+                </div>
             </div>
         </div>
 
-        <!-- 하단 4개 버튼 -->
-        <div id="button-area" class="flex-shrink-0 bg-slate-800 px-2">
-            <div id="button-container" class="flex justify-center gap-2 max-w-md mx-auto h-full items-center">
-                <!-- 4개의 버튼 고정 -->
-            </div>
+        <div id="button-area" class="flex-shrink-0 bg-slate-800 p-4 pb-6 min-h-[120px] max-h-[25vh] flex items-center justify-center">
+            <div id="button-container" class="flex justify-center gap-3 w-full max-w-md h-full items-stretch">
+                </div>
         </div>
     </div>
 
-    <!-- 시작/게임오버 오버레이 -->
-    <div id="main-overlay" class="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-4 sm:p-6 text-center overflow-y-auto text-white">
-        <h1 id="overlay-title" class="text-4xl sm:text-5xl font-black text-yellow-400 mb-4 italic">RHYTHM GAME</h1>
-        <p id="overlay-desc" class="text-slate-400 mb-8 sm:mb-10 text-sm sm:text-base">실수하면 즉시 종료!<br>박자에 맞춰 8개의 과일을 클리어하세요.</p>
-        <button id="start-btn" onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-4 sm:py-5 px-12 sm:px-16 rounded-full text-lg sm:text-2xl shadow-2xl active:scale-95 transition-all">START</button>
+    <div id="main-overlay" class="fixed inset-0 bg-slate-900/95 flex flex-col items-center justify-center z-[100] p-6 text-center text-white">
+        <h1 id="overlay-title" class="text-4xl font-black text-yellow-400 mb-2 italic tracking-wider">RHYTHM GAME</h1>
+        <p id="overlay-desc" class="text-slate-400 mb-8 text-sm leading-relaxed">실수하면 즉시 종료!<br>박자에 맞춰 8개의 과일을 클리어하세요.</p>
+        <button id="start-btn" onclick="startGame()" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-4 px-12 rounded-full text-xl shadow-2xl active:scale-95 transition-all">START</button>
     </div>
 
     <script>
@@ -102,7 +111,8 @@
             currentIndex: 0,
             isPlaying: false,
             canInput: false,
-            beatTimer: null
+            beatStartTime: 0,
+            beatDuration: 0
         };
 
         const slots = document.querySelectorAll('.slot');
@@ -110,85 +120,57 @@
         const mainOverlay = document.getElementById('main-overlay');
         const overlayTitle = document.getElementById('overlay-title');
         const overlayDesc = document.getElementById('overlay-desc');
-        const buttonArea = document.getElementById('button-area');
 
-        // 동적 높이 계산
-        function adjustLayout() {
-            const headerHeight = 72;
-            const screenHeight = window.innerHeight;
-            const availableHeight = screenHeight - headerHeight;
-            const buttonHeight = Math.max(availableHeight * 0.5, 100);
-            
-            buttonArea.style.height = buttonHeight + 'px';
-            buttonArea.style.padding = '8px';
-        }
-
-        // 호루라기 효과음 (FM 변조)
+        // 싱글 톤 기반 고정 오디오 이펙트
         function playWhistle() {
             try {
                 const ctx = getAudioContext();
-                if (ctx.state === 'suspended') {
-                    ctx.resume();
-                }
+                if (ctx.state === 'suspended') ctx.resume();
                 
                 const now = ctx.currentTime;
-                
-                const osc1 = ctx.createOscillator();
-                const osc2 = ctx.createOscillator();
+                const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
-                const lfo = ctx.createOscillator();
-                const lfoGain = ctx.createGain();
                 
-                lfo.frequency.value = 5;
-                lfoGain.gain.value = 30;
-                lfo.connect(lfoGain);
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(1000, now + 0.08);
                 
-                osc1.type = 'square';
-                osc1.frequency.setValueAtTime(1200, now);
-                lfoGain.connect(osc1.frequency);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
                 
-                osc2.type = 'triangle';
-                osc2.frequency.setValueAtTime(800, now);
-                
-                gain.gain.setValueAtTime(0.15, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                
-                osc1.connect(gain);
-                osc2.connect(gain);
+                osc.connect(gain);
                 gain.connect(ctx.destination);
                 
-                osc1.start(now);
-                osc2.start(now);
-                lfo.start(now);
-                
-                osc1.stop(now + 0.1);
-                osc2.stop(now + 0.1);
-                lfo.stop(now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.08);
             } catch (e) {
                 console.log('Audio error:', e);
             }
         }
 
-        // 하단 버튼 4개 생성
         function initButtons() {
             const container = document.getElementById('button-container');
             container.innerHTML = '';
             FRUITS.forEach(fruit => {
                 const btn = document.createElement('button');
-                btn.className = "flex-1 bg-slate-700 rounded-3xl text-3xl sm:text-4xl shadow-xl border-b-8 border-slate-900 active:border-b-0 active:translate-y-2 transition-all flex items-center justify-center hover:bg-slate-600";
-                btn.style.aspectRatio = '1 / 1';
+                // 고정 가로세로 비율 대신 flex-1과 items-stretch를 활용해 컨테이너 크기에 밀착시킴
+                btn.className = "flex-1 bg-slate-700 rounded-2xl text-3xl shadow-xl border-b-4 border-slate-900 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center hover:bg-slate-600 select-none";
                 btn.innerHTML = fruit.icon;
-                btn.onclick = () => handleInput(fruit.id);
+                
+                // 모바일 터치 즉시 반응을 위해 mousedown/touchstart 동시 바인딩
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleInput(fruit.id);
+                });
+                btn.addEventListener('mousedown', (e) => {
+                    handleInput(fruit.id);
+                });
+                
                 container.appendChild(btn);
             });
         }
 
         function startGame() {
-            const ctx = getAudioContext();
-            if (ctx.state === 'suspended') {
-                ctx.resume();
-            }
-            
             mainOverlay.classList.add('hidden');
             state.score = 0;
             state.level = 1;
@@ -211,76 +193,88 @@
             
             state.currentIndex = 0;
             state.isPlaying = true;
-            nextBeat();
+            startBeatTimer();
         }
 
         function runCountdown() {
             return new Promise(resolve => {
                 const counts = ['3', '2', '1', 'GO!'];
                 let i = 0;
-                
-                // BPM에 따른 박자 간격 (밀리초)
-                const beatInterval = 60000 / state.bpm;
+                const interval = 60000 / state.bpm;
                 
                 const playBeat = () => {
                     if (i < counts.length) {
-                        msgOverlay.innerHTML = `<span class="animate-count text-white">${counts[i]}</span>`;
+                        msgOverlay.innerHTML = `<span class="text-yellow-400 font-black animate-result">${counts[i]}</span>`;
                         playWhistle();
                         i++;
-                        setTimeout(playBeat, beatInterval);
+                        setTimeout(playBeat, interval);
                     } else {
                         msgOverlay.innerHTML = '';
                         resolve();
                     }
                 };
-                
                 playBeat();
             });
         }
 
         function generateSequence() {
-            let pool = [];
-            if (state.level === 1) {
-                pool = Array(8).fill(FRUITS[0]);
-            } else if (state.level === 2) {
-                pool = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * 2)]);
-            } else {
-                pool = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * 4)]);
-            }
-            return pool;
+            return Array(8).fill(null).map(() => {
+                if (state.level === 1) return FRUITS[0];
+                if (state.level === 2) return FRUITS[Math.floor(Math.random() * 2)];
+                return FRUITS[Math.floor(Math.random() * 4)];
+            });
         }
 
-        function nextBeat() {
+        // 고정밀 게임 루프 타이머 시작
+        function startBeatTimer() {
+            state.beatDuration = 60000 / state.bpm;
+            state.beatStartTime = performance.now();
+            setupNextBeat();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function setupNextBeat() {
             if (state.currentIndex >= 8) {
                 levelClear();
                 return;
             }
-
             slots.forEach(s => s.classList.remove('active-card'));
             slots[state.currentIndex].classList.add('active-card');
-            
-            // 박자 신호음 재생
             playWhistle();
             state.canInput = true;
+        }
 
-            const interval = 60000 / state.bpm;
-            state.beatTimer = setTimeout(() => {
-                if (state.canInput) gameOver("박자를 놓쳤습니다!");
-            }, interval);
+        // 밀림 없는 고정밀 루프 검사기
+        function gameLoop(timestamp) {
+            if (!state.isPlaying) return;
+
+            const elapsed = timestamp - state.beatStartTime;
+
+            if (elapsed >= state.beatDuration) {
+                // 시간 초과 시점에 유저가 입력을 처리하지 못했다면 아웃
+                if (state.canInput) {
+                    gameOver("박자를 놓쳤습니다!");
+                    return;
+                }
+                // 다음 박자로 전진
+                state.beatStartTime += state.beatDuration; // 오차 축적 방지
+                setupNextBeat();
+            }
+            requestAnimationFrame(gameLoop);
         }
 
         function handleInput(id) {
             if (!state.isPlaying || !state.canInput) return;
             
-            if (navigator.vibrate) navigator.vibrate(50);
-            clearTimeout(state.beatTimer);
-            state.canInput = false;
+            if (navigator.vibrate) navigator.vibrate(30);
+            state.canInput = false; // 이번 박자 입력 마감
 
             if (id === state.sequence[state.currentIndex].id) {
                 state.score += 10;
                 updateUI();
                 state.currentIndex++;
-                setTimeout(nextBeat, 50);
+                
+                // 유저가 맞춘 시점에 즉시 다음 비트로 타임스탬프 당기기 시도 방지 및 흐름 유지
             } else {
                 gameOver("틀린 과일을 눌렀습니다!");
             }
@@ -290,26 +284,25 @@
             state.isPlaying = false;
             slots.forEach(s => s.classList.remove('active-card'));
             
-            const results = ['PERFECT!', 'EXCELLENT!', 'GREAT!', 'AMAZING!'];
+            const results = ['PERFECT!', 'GREAT!', 'AMAZING!'];
             const res = results[Math.floor(Math.random() * results.length)];
-            msgOverlay.innerHTML = `<span class="animate-result text-yellow-400 drop-shadow-lg">${res}</span>`;
+            msgOverlay.innerHTML = `<span class="animate-result text-green-400 font-black">${res}</span>`;
 
             setTimeout(() => {
                 msgOverlay.innerHTML = '';
                 state.level++;
-                state.bpm += 15;
+                state.bpm = Math.min(state.bpm + 10, 140); // 최대 속도 제한
                 startLevel();
-            }, 2000);
+            }, 1500);
         }
 
         function gameOver(reason) {
-            clearTimeout(state.beatTimer);
             state.isPlaying = false;
-            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
             overlayTitle.innerText = "GAME OVER";
             overlayTitle.classList.replace('text-yellow-400', 'text-red-500');
-            overlayDesc.innerHTML = `${reason}<br><br><span class="text-white text-lg sm:text-2xl font-bold">최종 점수: ${state.score}</span>`;
+            overlayDesc.innerHTML = `${reason}<br><br><span class="text-white text-2xl font-bold">최종 점수: ${state.score}</span>`;
             document.getElementById('start-btn').innerText = "TRY AGAIN";
             mainOverlay.classList.remove('hidden');
         }
@@ -319,13 +312,9 @@
             document.getElementById('score').innerText = state.score;
         }
 
-        // 초기 설정
         window.addEventListener('load', () => {
             getAudioContext();
-            adjustLayout();
         });
-
-        window.addEventListener('resize', adjustLayout);
     </script>
 </body>
 </html>
