@@ -117,11 +117,11 @@
 
     <script>
         /* =====================================================
-           ★ 난이도 및 타이밍 미세 조절 섹션 ★
+           ★ 타이밍 및 난이도 조절 ★
            ===================================================== */
         const DIFFICULTY_SETTINGS = {
-            EASY_RATIO: 0.45,   // 1~3단계 Safe Zone (박자 간격의 45%)
-            HARD_RATIO: 0.20    // 4~5단계 Safe Zone (박자 간격의 20%)
+            EASY_RATIO: 0.45,
+            HARD_RATIO: 0.20
         };
 
         const LEVEL_CONFIG = {
@@ -137,41 +137,24 @@
             beatStartTime: 0, beatDuration: 0,
             hasInputThisBeat: false,
             earlyWindow: 0, lateWindow: 0,
-
-            // ── 타이밍 동기화 핵심 변수 ──
-            whistleOffset: 40,      // ★ 미세조정: 소리를 화면보다 몇 ms 일찍 재생할 것인가 (기본 40ms)
-            hasWhistlePlayed: false // 이번 박자에서 소리 재생 여부
+            // ★ 미세조정: 소리를 화면보다 일찍 재생 (ms)
+            // 소리가 늦다고 느껴지면 이 값을 키우세요 (예: 60, 80)
+            whistleOffset: 45, 
+            hasWhistlePlayed: false
         };
         /* ===================================================== */
 
-        function setScreenSize() {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        }
-        setScreenSize();
-        window.addEventListener('resize', setScreenSize);
-
-        const centerFlashText = document.getElementById('center-flash-text');
-        let flashTimer = null;
-
-        function showCenterFlash(text, color, durationMs) {
-            if (flashTimer) clearTimeout(flashTimer);
-            const dur = durationMs ? Math.max(durationMs * 0.92, 80) : 550;
-            document.documentElement.style.setProperty('--flash-dur', `${dur}ms`);
-            centerFlashText.textContent = text;
-            centerFlashText.style.color = color;
-            centerFlashText.classList.remove('flash-anim');
-            void centerFlashText.offsetWidth; 
-            centerFlashText.classList.add('flash-anim');
-        }
-
         let audioCtx = null;
         function getAudioCtx() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
             return audioCtx;
         }
 
-        /* ── 고퀄리티 전기 호루라기 사운드 ── */
         function playWhistle() {
             const ctx = getAudioCtx();
             const now = ctx.currentTime;
@@ -190,7 +173,6 @@
             osc2.type = 'sine';
             osc2.frequency.setValueAtTime(2815, now);
 
-            // 공기 마찰음을 위한 노이즈 추가
             const bufSize = ctx.sampleRate * 0.15;
             const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
             const data = buffer.getChannelData(0);
@@ -199,23 +181,39 @@
             noise.buffer = buffer;
             const filter = ctx.createBiquadFilter();
             filter.type = 'bandpass';
-            filter.frequency.value = 3000;
-            filter.Q.value = 8;
+            filter.frequency.value = 3000; filter.Q.value = 8;
 
             osc1.connect(masterGain); osc2.connect(masterGain);
             noise.connect(filter); filter.connect(masterGain);
-
             osc1.start(); osc2.start(); noise.start();
             osc1.stop(now + 0.18); osc2.stop(now + 0.18); noise.stop(now + 0.18);
+        }
+
+        function setScreenSize() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+        setScreenSize();
+        window.addEventListener('resize', setScreenSize);
+
+        const centerFlashText = document.getElementById('center-flash-text');
+        const slots = document.querySelectorAll('.slot');
+        const mainOverlay = document.getElementById('main-overlay');
+
+        function showCenterFlash(text, color, durationMs) {
+            const dur = durationMs ? Math.max(durationMs * 0.92, 80) : 550;
+            document.documentElement.style.setProperty('--flash-dur', `${dur}ms`);
+            centerFlashText.textContent = text;
+            centerFlashText.style.color = color;
+            centerFlashText.classList.remove('flash-anim');
+            void centerFlashText.offsetWidth; 
+            centerFlashText.classList.add('flash-anim');
         }
 
         const FRUITS = [
             { id: 'apple', icon: '🍎' }, { id: 'banana', icon: '🍌' },
             { id: 'grape', icon: '🍇' }, { id: 'orange', icon: '🍊' }
         ];
-
-        const slots = document.querySelectorAll('.slot');
-        const mainOverlay = document.getElementById('main-overlay');
 
         function initButtons() {
             const container = document.getElementById('button-container');
@@ -232,7 +230,9 @@
         }
 
         function startGame() {
-            getAudioCtx();
+            // 브라우저 차단 해제를 위해 먼저 오디오 실행
+            const ctx = getAudioCtx();
+            
             mainOverlay.classList.add('hidden');
             state.level = 1;
             initButtons();
@@ -244,20 +244,23 @@
             updateStepTracker();
             const config = LEVEL_CONFIG[state.level];
             state.sequence = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * config.poolSize)]);
-            slots.forEach((slot, i) => { slot.innerHTML = state.sequence[i].icon; slot.className = "slot fruit-card"; });
+            
+            slots.forEach((slot, i) => { 
+                slot.innerHTML = state.sequence[i].icon; 
+                slot.className = "slot fruit-card"; 
+            });
             
             await runCountdown();
             
             state.currentIndex = 0;
             state.beatDuration = 60000 / config.bpm;
-            
             const ratio = (state.level <= 3) ? DIFFICULTY_SETTINGS.EASY_RATIO : DIFFICULTY_SETTINGS.HARD_RATIO;
             state.earlyWindow = state.beatDuration * ratio;
             state.lateWindow = state.beatDuration * ratio;
 
             state.beatStartTime = performance.now();
             state.hasInputThisBeat = false;
-            state.hasWhistlePlayed = true; // 첫 박자 소리는 updateBeatHighlight에서 처리하므로 중복 방지
+            state.hasWhistlePlayed = true; // 첫 박자 중복 방지
             state.isPlaying = true;
 
             updateBeatHighlight();
@@ -267,18 +270,22 @@
         function runCountdown() {
             return new Promise(resolve => {
                 const counts = ['3', '2', '1', 'GO!'];
-                let i = 0; const interval = 60000 / LEVEL_CONFIG[state.level].bpm;
+                let i = 0; 
+                const interval = 60000 / LEVEL_CONFIG[state.level].bpm;
                 const tick = () => {
                     if (i < counts.length) {
                         showCenterFlash(counts[i], '#facc15', interval);
-                        playWhistle(); i++; setTimeout(tick, interval);
-                    } else resolve();
+                        playWhistle(); 
+                        i++; 
+                        setTimeout(tick, interval);
+                    } else {
+                        resolve();
+                    }
                 };
                 tick();
             });
         }
 
-        // 시각적 카드 하이라이트 전환
         function updateBeatHighlight() {
             if (state.currentIndex >= 8) return;
             slots.forEach((s, idx) => {
@@ -286,10 +293,7 @@
                 else s.className = "slot fruit-card";
             });
             slots[state.currentIndex].classList.add('active-card');
-            
-            // 정박에 맞춰 소리 재생 (첫 박자 대응)
             if (state.currentIndex === 0) playWhistle();
-            
             state.hasInputThisBeat = false; 
         }
 
@@ -297,24 +301,22 @@
             if (!state.isPlaying) return;
             const elapsed = timestamp - state.beatStartTime;
 
-            // ── [소리 타이밍 동기화 로직] ──
-            // 다음 박자가 오기 'whistleOffset' ms 전에 미리 소리를 재생합니다.
+            // 소리 먼저 재생 로직
             if (!state.hasWhistlePlayed && elapsed >= (state.beatDuration - state.whistleOffset)) {
                 playWhistle();
                 state.hasWhistlePlayed = true;
             }
 
-            // [판정] 늦었을 때 체크
+            // 실패 판정
             if (elapsed > state.lateWindow && !state.hasInputThisBeat) {
                 gameOver("타이밍을 놓쳤습니다!");
                 return;
             }
 
-            // 다음 박자(화면 전환) 시점
+            // 다음 박자 전환
             if (elapsed >= state.beatDuration) {
                 state.beatStartTime += state.beatDuration;
-                state.hasWhistlePlayed = false; // 소리 재생 플래그 리셋
-                
+                state.hasWhistlePlayed = false;
                 if (state.currentIndex >= 8) {
                     levelClear();
                 } else {
@@ -326,14 +328,10 @@
 
         function handleInput(id) {
             if (!state.isPlaying || state.hasInputThisBeat) return;
-
             const now = performance.now();
-            // 소리 오프셋만큼 판정 기준점을 보정하여 사용자가 소리에 맞춰 누를 때 정박으로 인식하게 함
-            const elapsed = (now - state.beatStartTime); 
+            const elapsed = now - state.beatStartTime;
 
-            const isInsideSafeZone = (elapsed >= -state.earlyWindow && elapsed <= state.lateWindow);
-
-            if (isInsideSafeZone) {
+            if (elapsed >= -state.earlyWindow && elapsed <= state.lateWindow) {
                 if (id === state.sequence[state.currentIndex].id) {
                     if (navigator.vibrate) navigator.vibrate(15);
                     slots[state.currentIndex].className = "slot fruit-card success-card";
@@ -342,10 +340,8 @@
                 } else {
                     gameOver("틀린 과일을 선택했습니다!");
                 }
-            } else {
-                if (elapsed > state.lateWindow) {
-                    gameOver("너무 늦었습니다!");
-                }
+            } else if (elapsed > state.lateWindow) {
+                gameOver("너무 늦었습니다!");
             }
         }
 
@@ -371,4 +367,30 @@
 
         function victory() {
             state.isPlaying = false;
-            const title = document.getElementByI
+            const title = document.getElementById('overlay-title');
+            title.innerText = "ALL CLEAR!";
+            title.className = "text-4xl font-black text-green-400 mb-2 italic tracking-wide animate-bounce";
+            document.getElementById('overlay-desc').innerHTML = "축하합니다!<br><span class='text-white text-xl font-bold'>당신은 진정한 리듬 마스터입니다!</span>";
+            document.getElementById('start-btn').innerText = "PLAY AGAIN";
+            mainOverlay.classList.remove('hidden');
+        }
+
+        function updateStepTracker() {
+            for (let i = 1; i <= 5; i++) {
+                const dot = document.getElementById(`step-${i}`);
+                const line = document.getElementById(`line-${i}`);
+                if (!dot) continue;
+                if (i === state.level) {
+                    dot.className = "step-dot active"; dot.style.opacity = "1";
+                } else if (i < state.level) {
+                    dot.className = "step-dot"; dot.style.background = "#6366f1"; dot.style.opacity = "0.6";
+                    if (line) line.className = "step-line active";
+                } else {
+                    dot.className = "step-dot"; dot.style.background = ""; dot.style.opacity = "1";
+                    if (line) line.className = "step-line";
+                }
+            }
+        }
+    </script>
+</body>
+</html>
