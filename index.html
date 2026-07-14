@@ -25,12 +25,6 @@
             align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.6);
             border-bottom: 1px solid rgba(51, 65, 85, 0.4);
         }
-        #msg-area { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
-        #msg-overlay {
-            font-size: clamp(1.2rem, 5vw, 1.8rem); font-weight: 900; color: #facc15;
-            pointer-events: none; letter-spacing: 0.1em; text-transform: uppercase;
-            min-height: 1.8em; line-height: 1;
-        }
         #slots-area {
             flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
             padding: 0 1rem; min-height: 0;
@@ -99,8 +93,6 @@
             <div class="pb-1 text-[9px] font-black tracking-widest text-slate-500 uppercase">Stage Progress</div>
         </div>
 
-        <div id="msg-area" style="padding: clamp(0.2rem, 1vh, 0.4rem) 0; visibility:hidden;"><div id="msg-overlay"></div></div>
-
         <div id="slots-area">
             <div id="slots-grid">
                 <div class="slot fruit-card"></div><div class="slot fruit-card"></div>
@@ -125,11 +117,22 @@
 
     <script>
         /* =====================================================
-           ★ 박자 판정 및 난이도 조절 (Safe Zone) ★
+           ★ 동적 난이도 조절 (BPM 연동 Safe Zone) ★
            ===================================================== */
-        const JUDGE_SETTINGS = {
-            EARLY_MS: 200, // 박자 시작 전 몇 ms부터 입력을 허용할지
-            LATE_MS: 200   // 박자 시작 후 몇 ms까지 입력을 허용할지
+        const DIFFICULTY_SETTINGS = {
+            EASY_RATIO: 0.45,   // 1~3단계: 박자 시간의 45%를 판정 범위로 허용 (매우 쉬움)
+            HARD_RATIO: 0.25,   // 4~5단계: 박자 시간의 25%만 판정 범위로 허용 (어려움)
+            
+            // 예: 90 BPM에서 1단계라면 박자 하나당 약 666ms입니다.
+            // EASY_RATIO 0.45 적용 시, 앞뒤로 약 300ms씩(총 600ms!)의 Safe Zone이 생깁니다.
+        };
+
+        const LEVEL_CONFIG = {
+            1: { bpm: 90,  poolSize: 1 }, 
+            2: { bpm: 100, poolSize: 2 },
+            3: { bpm: 120, poolSize: 3 }, 
+            4: { bpm: 180, poolSize: 4 }, // 여기서부터 속도와 판정이 확 어려워짐
+            5: { bpm: 230, poolSize: 4 }
         };
         /* ===================================================== */
 
@@ -174,27 +177,16 @@
             osc1.start(now); osc1.stop(now + DURATION);
         }
 
-        // 난이도 조절
-
         const FRUITS = [
-            { id: 'apple', icon: '🍎' },
-            { id: 'banana', icon: '🍌' },
-            { id: 'grape', icon: '🍇' },
-            { id: 'orange', icon: '🍊' }
+            { id: 'apple', icon: '🍎' }, { id: 'banana', icon: '🍌' },
+            { id: 'grape', icon: '🍇' }, { id: 'orange', icon: '🍊' }
         ];
-
-        const LEVEL_CONFIG = {
-            1: { bpm: 60, poolSize: 1 }, 
-            2: { bpm: 60, poolSize: 2 },
-            3: { bpm: 60, poolSize: 3 }, 
-            4: { bpm: 90, poolSize: 4 }, 
-            5: { bpm:120, poolSize: 4 }
-        };
 
         let state = {
             level: 1, sequence: [], currentIndex: 0, isPlaying: false,
-            canInput: false, beatStartTime: 0, beatDuration: 0,
-            hasInputThisBeat: false 
+            beatStartTime: 0, beatDuration: 0,
+            hasInputThisBeat: false,
+            earlyWindow: 0, lateWindow: 0 // 동적으로 계산될 윈도우
         };
 
         const slots = document.querySelectorAll('.slot');
@@ -227,13 +219,20 @@
         async function startLevel() {
             state.isPlaying = false;
             updateStepTracker();
-            state.sequence = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * LEVEL_CONFIG[state.level].poolSize)]);
+            const config = LEVEL_CONFIG[state.level];
+            state.sequence = Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * config.poolSize)]);
             slots.forEach((slot, i) => { slot.innerHTML = state.sequence[i].icon; slot.className = "slot fruit-card"; });
             
             await runCountdown();
             
             state.currentIndex = 0;
-            state.beatDuration = 60000 / LEVEL_CONFIG[state.level].bpm;
+            state.beatDuration = 60000 / config.bpm;
+            
+            // [핵심] 레벨에 따라 판정 범위 비율 설정
+            const ratio = (state.level <= 3) ? DIFFICULTY_SETTINGS.EASY_RATIO : DIFFICULTY_SETTINGS.HARD_RATIO;
+            state.earlyWindow = state.beatDuration * ratio;
+            state.lateWindow = state.beatDuration * ratio;
+
             state.beatStartTime = performance.now();
             state.hasInputThisBeat = false;
             state.isPlaying = true;
@@ -264,7 +263,6 @@
             });
             slots[state.currentIndex].classList.add('active-card');
             playWhistle();
-            state.canInput = true;
             state.hasInputThisBeat = false; 
         }
 
@@ -272,14 +270,13 @@
             if (!state.isPlaying) return;
             const elapsed = timestamp - state.beatStartTime;
 
-            // [수정] 실패 판정 로직:
-            // 현재 박자에서 아직 입력을 안 했는데, 허용된 LATE_MS 마저 지났을 때만 실패 처리
-            if (elapsed > JUDGE_SETTINGS.LATE_MS && !state.hasInputThisBeat) {
+            // [동적 판정] 박자 시작 후 lateWindow가 지났는데 입력을 안 했다면 탈락
+            if (elapsed > state.lateWindow && !state.hasInputThisBeat) {
                 gameOver("박자를 놓쳤습니다!");
                 return;
             }
 
-            // 다음 박자로 넘어가는 처리
+            // 다음 박자로 전환
             if (elapsed >= state.beatDuration) {
                 state.beatStartTime += state.beatDuration;
                 if (state.currentIndex >= 8) {
@@ -297,25 +294,26 @@
             const now = performance.now();
             const elapsed = now - state.beatStartTime;
 
-            // Safe Zone 판정 (-EARLY_MS ~ +LATE_MS)
-            const isInsideSafeZone = (elapsed >= -JUDGE_SETTINGS.EARLY_MS && elapsed <= JUDGE_SETTINGS.LATE_MS);
+            // [동적 판정] -earlyWindow ~ +lateWindow 사이인지 체크
+            const isInsideSafeZone = (elapsed >= -state.earlyWindow && elapsed <= state.lateWindow);
 
             if (isInsideSafeZone) {
                 if (id === state.sequence[state.currentIndex].id) {
-                    // 성공 처리
                     if (navigator.vibrate) navigator.vibrate(15);
                     slots[state.currentIndex].className = "slot fruit-card success-card";
-                    state.hasInputThisBeat = true; // 이 박자에서 할 일을 다 했음을 기록
+                    state.hasInputThisBeat = true; 
                     state.currentIndex++;
                 } else {
                     gameOver("틀린 과일을 선택했습니다!");
                 }
             } else {
-                // Safe Zone 밖에서 눌렀을 때
-                if (elapsed > JUDGE_SETTINGS.LATE_MS) {
-                    gameOver("박자가 늦었습니다!");
+                // 범위를 벗어나서 눌렀을 때
+                if (elapsed > state.lateWindow) {
+                    gameOver("너무 늦었습니다!");
+                } else if (elapsed < -state.earlyWindow) {
+                    // 너무 빨리 누른 경우 (보통 무시하거나 아주 짧은 쿨타임 부여 가능)
+                    console.log("Too early!");
                 }
-                // EARLY_MS 보다 너무 일찍 누른 경우는 무시 (혹은 패널티)
             }
         }
 
