@@ -275,7 +275,7 @@
     <script>
         // ── [수정 가능] 판정 Safe Zone (난이도 조절 부분) ──
         const JUDGE_SETTINGS = {
-            EARLY_MS: 180, // ★ 박자 시작 "전" 몇 ms부터 입력을 허용할지
+            EARLY_MS: 200, // ★ 박자 시작 "전" 몇 ms부터 입력을 허용할지
             LATE_MS: 200   // ★ 박자 시작 "후" 몇 ms까지 입력을 허용할지
         };
         // ──────────────────────────────────────────────
@@ -343,6 +343,8 @@
             noiseSource.start(now); noiseSource.stop(endTime);
         }
 
+        // ── [수정 가능] 과일 종류 및 속도 (난이도 조절 부분) ──
+
         const FRUITS = [
             { id: 'apple',  icon: '🍎' },
             { id: 'banana', icon: '🍌' },
@@ -357,6 +359,7 @@
             4: { bpm: 180, poolSize: 4 },
             5: { bpm: 240, poolSize: 4 },
         };
+        // ──────────────────────────────────────────────
 
         let state = {
             level: 1,
