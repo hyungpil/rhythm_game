@@ -198,7 +198,8 @@
             100% { opacity: 0;    transform: scale(0.9); }
         }
         .flash-anim {
-            animation: flashPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            /* duration은 JS에서 --flash-dur 변수로 BPM에 맞게 주입됨 */
+            animation: flashPop var(--flash-dur, 0.55s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
         body { touch-action: none; -webkit-tap-highlight-color: transparent; }
@@ -287,8 +288,12 @@
         const centerFlashText = document.getElementById('center-flash-text');
         let flashTimer = null;
 
-        function showCenterFlash(text, color) {
+        // durationMs: 한 박자 길이(ms). 생략 시 550ms 고정
+        function showCenterFlash(text, color, durationMs) {
             if (flashTimer) clearTimeout(flashTimer);
+            const dur = durationMs ? Math.max(durationMs * 0.92, 80) : 550;
+            // CSS 변수로 애니메이션 지속시간 주입 → BPM에 맞게 자동 조정
+            document.documentElement.style.setProperty('--flash-dur', `${dur}ms`);
             centerFlashText.textContent = text;
             centerFlashText.style.color = color;
             // 애니메이션 재실행을 위해 클래스 리셋
@@ -298,7 +303,7 @@
             flashTimer = setTimeout(() => {
                 centerFlashText.classList.remove('flash-anim');
                 centerFlashText.style.opacity = '0';
-            }, 560);
+            }, dur + 20);
         }
 
         // ── Web Audio API 컨텍스트 ──
@@ -427,13 +432,21 @@
             { id: 'orange', icon: '🍊' }
         ];
 
+        // ╔══════════════════════════════════════════════════════╗
+        // ║           ★ 레벨 난이도 설정 (직접 수정 가능) ★           ║
+        // ╠══════════════════════════════════════════════════════╣
+        // ║  bpm      : 박자 속도. 숫자가 클수록 빠름               ║
+        // ║             권장 범위: 40(매우 느림) ~ 240(극한)         ║
+        // ║  poolSize : 등장하는 과일 종류 수 (1~4)                 ║
+        // ║             1=사과만, 2=사과+바나나, 3=+포도, 4=전체    ║
+        // ╚══════════════════════════════════════════════════════╝
         const LEVEL_CONFIG = {
-            1: { bpm: 60,  poolSize: 1 },
-            2: { bpm: 75,  poolSize: 2 },
-            3: { bpm: 90,  poolSize: 3 },
-            4: { bpm: 155, poolSize: 4 },
-            5: { bpm: 210, poolSize: 4 }
-        };
+            1: { bpm:  60, poolSize: 1 },  // Lv1  ← 느리게, 한 종류만
+            2: { bpm:  75, poolSize: 2 },  // Lv2
+            3: { bpm:  90, poolSize: 3 },  // Lv3
+            4: { bpm: 155, poolSize: 4 },  // Lv4  ← 여기서 속도가 확 뜀
+            5: { bpm: 210, poolSize: 4 },  // Lv5  ← 극한 속도
+        };                                 // ↑ bpm / poolSize 숫자만 바꾸면 됨
 
         let state = {
             level: 1,
@@ -540,10 +553,12 @@
             return new Promise(resolve => {
                 const counts   = ['3', '2', '1', 'START!'];
                 let i          = 0;
+                // 게임과 동일한 BPM 간격으로 카운트다운
                 const interval = 60000 / LEVEL_CONFIG[state.level].bpm;
                 const playBeat = () => {
                     if (i < counts.length) {
-                        showCenterFlash(counts[i], COUNTDOWN_COLORS[counts[i]] || '#facc15');
+                        // interval을 넘겨 애니메이션 속도도 BPM에 맞춤
+                        showCenterFlash(counts[i], COUNTDOWN_COLORS[counts[i]] || '#facc15', interval);
                         playWhistle();
                         i++;
                         setTimeout(playBeat, interval);
