@@ -111,7 +111,7 @@
 
     <div id="main-overlay" class="fixed inset-0 bg-slate-950/98 flex flex-col items-center justify-center z-[100] p-8 text-center text-white">
         <h1 id="overlay-title" class="text-4xl font-black text-yellow-400 mb-2 italic tracking-wide">FRUIT RHYTHM</h1>
-        <p id="overlay-desc" class="text-slate-400 mb-8 text-sm leading-relaxed">박자에 맞춰 하이라이트 카드를 따라 누르세요.<br>1~3단계는 기본 연습, <span class="text-red-400 font-bold">4단계부터 극악의 속도</span>가 시작됩니다.</p>
+        <p id="overlay-desc" class="text-slate-400 mb-8 text-sm leading-relaxed">박자에 맞춰 하이라이트 카드를 따라 누르세요.<br>1~3단계는 기본 연습, <span class="text-red-400 font-bold">4단계부터 속도와 판정</span>이 엄격해집니다.</p>
         <button id="start-btn" onclick="startGame()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 px-16 rounded-2xl text-xl shadow-2xl active:scale-95 transition-all duration-75">GAME START</button>
     </div>
 
@@ -120,19 +120,16 @@
            ★ 동적 난이도 조절 (BPM 연동 Safe Zone) ★
            ===================================================== */
         const DIFFICULTY_SETTINGS = {
-            EASY_RATIO: 0.45,   // 1~3단계: 박자 시간의 45%를 판정 범위로 허용 (매우 쉬움)
-            HARD_RATIO: 0.25,   // 4~5단계: 박자 시간의 25%만 판정 범위로 허용 (어려움)
-            
-            // 예: 90 BPM에서 1단계라면 박자 하나당 약 666ms입니다.
-            // EASY_RATIO 0.45 적용 시, 앞뒤로 약 300ms씩(총 600ms!)의 Safe Zone이 생깁니다.
+            EASY_RATIO: 0.45,   // 1~3단계: 박자 간격의 45%를 Safe Zone으로 설정 (매우 쉬움)
+            HARD_RATIO: 0.20    // 4~5단계: 박자 간격의 20%를 Safe Zone으로 설정 (정교한 타이밍)
         };
 
         const LEVEL_CONFIG = {
             1: { bpm: 90,  poolSize: 1 }, 
             2: { bpm: 100, poolSize: 2 },
             3: { bpm: 120, poolSize: 3 }, 
-            4: { bpm: 180, poolSize: 4 }, // 여기서부터 속도와 판정이 확 어려워짐
-            5: { bpm: 230, poolSize: 4 }
+            4: { bpm: 170, poolSize: 4 }, 
+            5: { bpm: 220, poolSize: 4 }
         };
         /* ===================================================== */
 
@@ -163,18 +160,47 @@
             return audioCtx;
         }
 
+        /* ── 개선된 호루라기 소리 (Electric Whistle) ── */
         function playWhistle() {
-            const ctx = getAudioCtx(); const now = ctx.currentTime;
-            const FREQ = 3200; const DURATION = 0.18;
+            const ctx = getAudioCtx();
+            const now = ctx.currentTime;
+            
             const masterGain = ctx.createGain();
-            masterGain.gain.setValueAtTime(0.001, now);
-            masterGain.gain.linearRampToValueAtTime(0.55, now + 0.008);
-            masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.128);
+            masterGain.gain.setValueAtTime(0, now);
+            masterGain.gain.linearRampToValueAtTime(0.4, now + 0.01);
+            masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
             masterGain.connect(ctx.destination);
-            const osc1 = ctx.createOscillator(); osc1.type = 'sine'; osc1.frequency.setValueAtTime(FREQ, now);
-            const osc1Gain = ctx.createGain(); osc1Gain.gain.value = 0.6;
-            osc1.connect(osc1Gain); osc1Gain.connect(masterGain);
-            osc1.start(now); osc1.stop(now + DURATION);
+
+            // 두 개의 사인파를 디튠하여 날카로운 휘슬 느낌 생성
+            const osc1 = ctx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(2800, now);
+            osc1.frequency.exponentialRampToValueAtTime(3100, now + 0.05);
+
+            const osc2 = ctx.createOscillator();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(2815, now);
+
+            // 화이트 노이즈로 공기 마찰음 추가
+            const bufSize = ctx.sampleRate * 0.2;
+            const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 3000;
+            filter.Q.value = 10;
+
+            osc1.connect(masterGain);
+            osc2.connect(masterGain);
+            noise.connect(filter);
+            filter.connect(masterGain);
+
+            osc1.start(); osc2.start(); noise.start();
+            osc1.stop(now + 0.2); osc2.stop(now + 0.2); noise.stop(now + 0.2);
         }
 
         const FRUITS = [
@@ -186,13 +212,11 @@
             level: 1, sequence: [], currentIndex: 0, isPlaying: false,
             beatStartTime: 0, beatDuration: 0,
             hasInputThisBeat: false,
-            earlyWindow: 0, lateWindow: 0 // 동적으로 계산될 윈도우
+            earlyWindow: 0, lateWindow: 0
         };
 
         const slots = document.querySelectorAll('.slot');
         const mainOverlay = document.getElementById('main-overlay');
-        const overlayTitle = document.getElementById('overlay-title');
-        const overlayDesc = document.getElementById('overlay-desc');
 
         function initButtons() {
             const container = document.getElementById('button-container');
@@ -228,7 +252,6 @@
             state.currentIndex = 0;
             state.beatDuration = 60000 / config.bpm;
             
-            // [핵심] 레벨에 따라 판정 범위 비율 설정
             const ratio = (state.level <= 3) ? DIFFICULTY_SETTINGS.EASY_RATIO : DIFFICULTY_SETTINGS.HARD_RATIO;
             state.earlyWindow = state.beatDuration * ratio;
             state.lateWindow = state.beatDuration * ratio;
@@ -243,7 +266,7 @@
 
         function runCountdown() {
             return new Promise(resolve => {
-                const counts = ['3', '2', '1', 'START!'];
+                const counts = ['3', '2', '1', 'GO!'];
                 let i = 0; const interval = 60000 / LEVEL_CONFIG[state.level].bpm;
                 const tick = () => {
                     if (i < counts.length) {
@@ -262,7 +285,7 @@
                 else s.className = "slot fruit-card";
             });
             slots[state.currentIndex].classList.add('active-card');
-            playWhistle();
+            playWhistle(); // 호루라기 소리와 하이라이트가 동시에 발생
             state.hasInputThisBeat = false; 
         }
 
@@ -270,9 +293,9 @@
             if (!state.isPlaying) return;
             const elapsed = timestamp - state.beatStartTime;
 
-            // [동적 판정] 박자 시작 후 lateWindow가 지났는데 입력을 안 했다면 탈락
+            // [LATE 판정] 소리가 나고 일정 시간이 지났는데 입력이 없으면 실패
             if (elapsed > state.lateWindow && !state.hasInputThisBeat) {
-                gameOver("박자를 놓쳤습니다!");
+                gameOver("타이밍을 놓쳤습니다!");
                 return;
             }
 
@@ -294,7 +317,7 @@
             const now = performance.now();
             const elapsed = now - state.beatStartTime;
 
-            // [동적 판정] -earlyWindow ~ +lateWindow 사이인지 체크
+            // [EARLY & LATE 판정] 소리(정박) 기준 앞뒤 윈도우 내에 있는지 확인
             const isInsideSafeZone = (elapsed >= -state.earlyWindow && elapsed <= state.lateWindow);
 
             if (isInsideSafeZone) {
@@ -307,11 +330,10 @@
                     gameOver("틀린 과일을 선택했습니다!");
                 }
             } else {
-                // 범위를 벗어나서 눌렀을 때
                 if (elapsed > state.lateWindow) {
                     gameOver("너무 늦었습니다!");
                 } else if (elapsed < -state.earlyWindow) {
-                    // 너무 빨리 누른 경우 (보통 무시하거나 아주 짧은 쿨타임 부여 가능)
+                    // 너무 빨리 누른 경우 무시 (혹은 패널티)
                     console.log("Too early!");
                 }
             }
@@ -330,18 +352,19 @@
         function gameOver(reason) {
             state.isPlaying = false;
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-            overlayTitle.innerText = "GAME OVER";
-            overlayTitle.className = "text-4xl font-black text-red-500 mb-2 italic tracking-wide";
-            overlayDesc.innerHTML = `${reason}<br><br><span class='text-slate-400 text-lg'>최종 통과 단계: <span class='text-yellow-400 font-black'>Level ${state.level}</span></span>`;
+            document.getElementById('overlay-title').innerText = "GAME OVER";
+            document.getElementById('overlay-title').className = "text-4xl font-black text-red-500 mb-2 italic tracking-wide";
+            document.getElementById('overlay-desc').innerHTML = `${reason}<br><br><span class='text-slate-400 text-lg'>최종 통과 단계: <span class='text-yellow-400 font-black'>Level ${state.level}</span></span>`;
             document.getElementById('start-btn').innerText = "RETRY";
             mainOverlay.classList.remove('hidden');
         }
 
         function victory() {
             state.isPlaying = false;
-            overlayTitle.innerText = "ALL CLEAR!";
-            overlayTitle.className = "text-4xl font-black text-green-400 mb-2 italic tracking-wide animate-bounce";
-            overlayDesc.innerHTML = "축하합니다!<br><span class='text-white text-xl font-bold'>당신은 진정한 리듬 마스터입니다!</span>";
+            const title = document.getElementById('overlay-title');
+            title.innerText = "ALL CLEAR!";
+            title.className = "text-4xl font-black text-green-400 mb-2 italic tracking-wide animate-bounce";
+            document.getElementById('overlay-desc').innerHTML = "축하합니다!<br><span class='text-white text-xl font-bold'>당신은 진정한 리듬 마스터입니다!</span>";
             document.getElementById('start-btn').innerText = "PLAY AGAIN";
             mainOverlay.classList.remove('hidden');
         }
