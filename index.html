@@ -172,6 +172,35 @@
         }
         .animate-result { animation: zoomResult 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
+        /* ── 정중앙 플래시 오버레이 ── */
+        #center-flash {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 90;
+        }
+        #center-flash-text {
+            font-size: clamp(3.5rem, 18vw, 7rem);
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            text-shadow: 0 0 40px currentColor, 0 4px 20px rgba(0,0,0,0.6);
+            opacity: 0;
+            transform: scale(0.4);
+            transition: none;
+        }
+        @keyframes flashPop {
+            0%   { opacity: 0;    transform: scale(0.4); }
+            30%  { opacity: 1;    transform: scale(1.15); }
+            60%  { opacity: 1;    transform: scale(1); }
+            100% { opacity: 0;    transform: scale(0.9); }
+        }
+        .flash-anim {
+            animation: flashPop 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
         body { touch-action: none; -webkit-tap-highlight-color: transparent; }
 
         /* ── 버튼 카드 추가 스타일 ── */
@@ -206,8 +235,8 @@
             <div class="pb-1 text-[9px] font-black tracking-widest text-slate-500 uppercase">Stage Progress</div>
         </div>
 
-        <!-- 메시지 -->
-        <div id="msg-area" style="padding: clamp(0.3rem, 2vh, 0.8rem) 0;">
+        <!-- 작은 메시지 (사용 안 함 – 레이아웃 여백만 유지) -->
+        <div id="msg-area" style="padding: clamp(0.2rem, 1vh, 0.4rem) 0; visibility:hidden;">
             <div id="msg-overlay"></div>
         </div>
 
@@ -231,6 +260,11 @@
         </div>
     </div>
 
+    <!-- 정중앙 플래시 오버레이 -->
+    <div id="center-flash">
+        <span id="center-flash-text"></span>
+    </div>
+
     <!-- 메인 오버레이 -->
     <div id="main-overlay" class="fixed inset-0 bg-slate-950/98 flex flex-col items-center justify-center z-[100] p-8 text-center text-white">
         <h1 id="overlay-title" class="text-4xl font-black text-yellow-400 mb-2 italic tracking-wide">FRUIT RHYTHM</h1>
@@ -247,6 +281,25 @@
         setScreenSize();
         window.addEventListener('resize', setScreenSize);
         window.addEventListener('orientationchange', () => { setTimeout(setScreenSize, 100); });
+
+        // ── 정중앙 플래시 표시 ──
+        const centerFlash     = document.getElementById('center-flash');
+        const centerFlashText = document.getElementById('center-flash-text');
+        let flashTimer = null;
+
+        function showCenterFlash(text, color) {
+            if (flashTimer) clearTimeout(flashTimer);
+            centerFlashText.textContent = text;
+            centerFlashText.style.color = color;
+            // 애니메이션 재실행을 위해 클래스 리셋
+            centerFlashText.classList.remove('flash-anim');
+            void centerFlashText.offsetWidth; // reflow
+            centerFlashText.classList.add('flash-anim');
+            flashTimer = setTimeout(() => {
+                centerFlashText.classList.remove('flash-anim');
+                centerFlashText.style.opacity = '0';
+            }, 560);
+        }
 
         // ── Web Audio API 컨텍스트 ──
         let audioCtx = null;
@@ -476,6 +529,13 @@
             return Array(8).fill(null).map(() => FRUITS[Math.floor(Math.random() * config.poolSize)]);
         }
 
+        const COUNTDOWN_COLORS = {
+            '3':      '#f87171', // red-400
+            '2':      '#fb923c', // orange-400
+            '1':      '#facc15', // yellow-400
+            'START!': '#4ade80', // green-400
+        };
+
         function runCountdown() {
             return new Promise(resolve => {
                 const counts   = ['3', '2', '1', 'START!'];
@@ -483,12 +543,11 @@
                 const interval = 60000 / LEVEL_CONFIG[state.level].bpm;
                 const playBeat = () => {
                     if (i < counts.length) {
-                        msgOverlay.innerHTML = `<span class="animate-result inline-block text-yellow-400 font-black">${counts[i]}</span>`;
+                        showCenterFlash(counts[i], COUNTDOWN_COLORS[counts[i]] || '#facc15');
                         playWhistle();
                         i++;
                         setTimeout(playBeat, interval);
                     } else {
-                        msgOverlay.innerText = '';
                         resolve();
                     }
                 };
@@ -555,7 +614,16 @@
             state.isPlaying = false;
             slots.forEach(s => s.className = "slot fruit-card success-card");
             const pick = CLEAR_MSGS[Math.floor(Math.random() * CLEAR_MSGS.length)];
-            msgOverlay.innerHTML = `<span class="animate-result ${pick.color} font-black">${pick.text}</span>`;
+            // color 클래스에서 실제 hex 값으로 매핑
+            const colorMap = {
+                'text-yellow-300': '#fde047',
+                'text-pink-400':   '#f472b6',
+                'text-green-400':  '#4ade80',
+                'text-cyan-400':   '#22d3ee',
+                'text-orange-400': '#fb923c',
+                'text-purple-400': '#c084fc',
+            };
+            showCenterFlash(pick.text, colorMap[pick.color] || '#facc15');
 
             setTimeout(() => {
                 msgOverlay.innerText = '';
